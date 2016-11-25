@@ -18,8 +18,11 @@
  */
 package com.datatorrent.contrib.parser;
 
+import java.io.IOException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,7 +32,29 @@ import com.datatorrent.api.Context;
 import com.datatorrent.api.DefaultOutputPort;
 import com.datatorrent.lib.parser.Parser;
 import com.datatorrent.lib.util.KeyValPair;
+import com.datatorrent.netlet.util.DTThrowable;
 
+/**
+ * Operator that parses a log string tuple against the
+ * default log formats or a specified json schema and emits POJO on a parsed port and tuples that could not be
+ * parsed on error port.<br>
+ * <b>Properties</b><br>
+ * <b>jsonSchema</b>:schema as a string<br>
+ * <b>clazz</b>:Pojo class in case of user specified schema<br>
+ * <b>Ports</b> <br>
+ * <b>in</b>:input tuple as a String. Each tuple represents a log<br>
+ * <b>parsedOutput</b>:tuples that are validated against the default or user specified schema are emitted
+ * as POJO on this port<br>
+ * <b>err</b>:tuples that do not confine to log format are emitted on this port as
+ * KeyValPair<String,String><br>
+ * Key being the tuple and Val being the reason.
+ *
+ *
+ * @displayName LogParser
+ * @category Parsers
+ * @tags log pojo parser
+ * @since 3.6.0
+ */
 public class LogParser extends Parser<byte[], KeyValPair<String, String>>
 {
   private transient Class<?> clazz;
@@ -40,7 +65,12 @@ public class LogParser extends Parser<byte[], KeyValPair<String, String>>
 
   private LogSchemaDetails logSchemaDetails;
 
-  Log log;
+  private Log log;
+
+  public void setObjMapper(ObjectMapper objMapper)
+  {
+    this.objMapper = objMapper;
+  }
 
   private transient ObjectMapper objMapper;
 
@@ -99,15 +129,13 @@ public class LogParser extends Parser<byte[], KeyValPair<String, String>>
       errorTupleCount++;
       return;
     }
-
     String incomingString = new String(inputTuple);
     logger.info("Input string {} ", incomingString);
-
     try {
       if(this.logSchemaDetails != null) {
         logger.info("Parsing with CUSTOM log format has been started {}", this.geLogFileFormat());
         if (parsedOutput.isConnected()) {
-          parsedOutput.emit(objMapper.readValue(createJsonFromLog(incomingString, this.logSchemaDetails.getPattern()).toString().getBytes(), clazz));
+          parsedOutput.emit(objMapper.readValue(this.logSchemaDetails.createJsonFromLog(incomingString).toString().getBytes(), clazz));
           parsedOutputCount++;
         }
       } else {
@@ -136,7 +164,12 @@ public class LogParser extends Parser<byte[], KeyValPair<String, String>>
    */
   public void setupLog()
   {
-    DefaultLogs defaultLog = DefaultLogs.valueOf(logFileFormat.toUpperCase());
+    DefaultLogs defaultLog;
+    if(org.apache.commons.lang3.EnumUtils.isValidEnum(DefaultLogs.class, logFileFormat.toUpperCase())){
+      defaultLog = DefaultLogs.valueOf(logFileFormat.toUpperCase());
+    } else {
+      defaultLog = DefaultLogs.CUSTOM;
+    }
     switch (defaultLog) {
       case COMMON:
         log = new CommonLog();
@@ -156,41 +189,12 @@ public class LogParser extends Parser<byte[], KeyValPair<String, String>>
         try {
           //parse the schema in logFileFormat string
           this.logSchemaDetails = new LogSchemaDetails(logFileFormat);
-        } catch (Exception e) {
+        } catch (JSONException | IOException e) {
           logger.error("Error while initializing the custom log format " + e.getMessage());
+          DTThrowable.wrapIfChecked(e);
         }
         break;
     }
-  }
-
-  /**
-   * creates json object by matching the log with given pattern
-   *
-   * @param log
-   * @param pattern
-   * @return logObject
-   * @throws Exception
-   */
-  public JSONObject createJsonFromLog(String log, String pattern) throws Exception
-  {
-    Pattern compile = Pattern.compile(pattern);
-    Matcher m = compile.matcher(log);
-    int count = m.groupCount();
-    int i = 1;
-    JSONObject logObject = new JSONObject();
-    if(m.find()) {
-      for(String field: this.logSchemaDetails.getFieldNames()) {
-        if(i == count) {
-          break;
-        }
-        logObject.put(field, m.group(i));
-        i++;
-      }
-    } else {
-      throw new Exception("No match found for log : " + log);
-    }
-    logger.info("Json created {}", logObject);
-    return logObject;
   }
 
   /**

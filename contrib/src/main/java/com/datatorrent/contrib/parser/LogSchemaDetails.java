@@ -26,6 +26,30 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * <p>
+ * This is schema that defines fields and their regex
+ * The operators use this information to validate the incoming tuples.
+ * Information from JSON schema is saved in this object and is used by the
+ * operators
+ * <p>
+ * <br>
+ * <br>
+ * Example schema <br>
+ * <br>
+ * {@code{ "fields": [{"field": "host","regex": "^([0-9.]+)"},
+ * {"field": "rfc931","regex": "([w. -]+)"},
+ * {"field": "userName","regex": "(.*?)"},
+ * {"field": "datetime","regex": "\\[(.*?)\\]"},
+ * {"field": "request","regex": "\"((?:[^\"]|\")+)\""},
+ * {"field": "statusCode","regex": "(\\d{3})"},
+ * {"field": "bytes","regex": "(\\d+|-)"}]}
+ *
+ * @since 3.6.0
+ */
 
 public class LogSchemaDetails {
 
@@ -54,7 +78,6 @@ public class LogSchemaDetails {
 
   /**
    * For a given json string, this method sets the field members
-   *
    * @param json
    * @throws JSONException
    * @throws IOException
@@ -74,7 +97,6 @@ public class LogSchemaDetails {
 
   /**
    * creates regex group pattern from the regex given for each field
-   *
    */
   public void createPattern()
   {
@@ -87,8 +109,34 @@ public class LogSchemaDetails {
   }
 
   /**
+   * creates json object by matching the log with given pattern
+   * @param log
+   * @return logObject
+   * @throws Exception
+   */
+  public JSONObject createJsonFromLog(String log) throws Exception
+  {
+    Pattern compile = Pattern.compile(this.pattern);
+    Matcher m = compile.matcher(log);
+    int count = m.groupCount();
+    int i = 1;
+    JSONObject logObject = new JSONObject();
+    if(m.find()) {
+      for(String field: this.getFieldNames()) {
+        if(i == count) {
+          break;
+        }
+        logObject.put(field, m.group(i));
+        i++;
+      }
+    } else {
+      throw new Exception("No match found for log : " + log);
+    }
+    return logObject;
+  }
+
+  /**
    * Get the list of fieldNames mentioned in schema
-   *
    * @return fieldNames
    */
   public List<String> getFieldNames()
@@ -98,7 +146,6 @@ public class LogSchemaDetails {
 
   /**
    * Get the list of fields (field, regex) mentioned in schema
-   *
    * @return fields
    */
   public List<Field> getFields()
@@ -107,7 +154,6 @@ public class LogSchemaDetails {
   }
 
   /**
-   *
    * Get the regex pattern for the schema
    * @return pattern
    */
@@ -118,7 +164,6 @@ public class LogSchemaDetails {
 
   /**
    * Set the regex pattern for schema
-   *
    * @param pattern
    */
   public void setPattern(String pattern)
@@ -146,7 +191,6 @@ public class LogSchemaDetails {
 
     /**
      * Get the name of the field
-     *
      * @return name
      */
     public String getName()
@@ -156,7 +200,6 @@ public class LogSchemaDetails {
 
     /**
      * Set the name of the field
-     *
      * @param name
      */
     public void setName(String name)
@@ -166,7 +209,6 @@ public class LogSchemaDetails {
 
     /**
      * Get the regular expression of the field
-     *
      * @return
      */
     public String getRegex()
@@ -176,7 +218,6 @@ public class LogSchemaDetails {
 
     /**
      * Set the regular expression of the field
-     *
      * @param regex
      */
     public void setRegex(String regex)

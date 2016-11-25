@@ -35,8 +35,8 @@ public class CombinedLog implements Log {
   private String cookie;
 
   @Override
-  public Log getLog(String log){
-    String pattern="^([0-9.]+) ([w. -]+) (.*?) \\[(.*?)\\] \"((?:[^\"]|\")+)\" (\\d{3}) (\\d+|-) \"((?:[^\"]|\")+)\"(.*?)\"";
+  public Log getLog(String log) throws Exception {
+    String pattern="^([0-9.]+) ([w. -]+) (.*?) \\[(.*?)\\] \"((?:[^\"]|\")+)\" (\\d{3}) (\\d+|-) \"((?:[^\"]|\")+)\" \"((?:[^\"]|\")+)\" \"(.*?)\"";
     Pattern compile = Pattern.compile(pattern);
     Matcher m = compile.matcher(log);
 
@@ -50,6 +50,9 @@ public class CombinedLog implements Log {
       this.setBytes(m.group(7));
       this.setReferrer(m.group(8));
       this.setUser_agent(m.group(9));
+      this.setCookie(m.group(10));
+    } else {
+      throw new Exception("No match found");
     }
     return this;
   }

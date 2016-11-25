@@ -23,7 +23,8 @@ public enum DefaultLogs {
   EXTENDED("extended"),
   COMMON("common"),
   COMBINED("combined"),
-  SYS("sys");
+  SYS("sys"),
+  CUSTOM("");
 
   private String value;
 
