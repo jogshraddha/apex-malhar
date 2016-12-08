@@ -21,7 +21,8 @@ package com.datatorrent.contrib.parser;
 
 
 public enum DefaultLogs {
-  COMMON("common");
+  COMMON("common"),
+  COMBINED("combined");
 
   private String value;
 

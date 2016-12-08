@@ -121,6 +121,45 @@ public class LogParserTest
   }
 
   @Test
+  public void TestValidCombinedLogInputCase() throws JSONException
+  {
+    logParser.setLogFileFormat("combined");
+    logParser.setup(null);
+    logParser.setupLog();
+    logParser.beginWindow(0);
+    String log = "125.125.125.125 - dsmith [10/Oct/1999:21:15:05 +0500] \"GET /index.html HTTP/1.0\" 200 1043 \"http://www.ibm.com/\" \"Mozilla/4.05 [en] (WinNT; I)\" \"USERID=CustomerA;IMPID=01234\"";
+    logParser.in.process(log.getBytes());
+    logParser.endWindow();
+    Assert.assertEquals(1, pojoPort.collectedTuples.size());
+    Assert.assertEquals(0, error.collectedTuples.size());
+    Object obj = pojoPort.collectedTuples.get(0);
+    Assert.assertNotNull(obj);
+    Assert.assertEquals(CombinedLog.class, obj.getClass());
+    CombinedLog pojo = (CombinedLog)obj;
+    Assert.assertNotNull(obj);
+    Assert.assertEquals("125.125.125.125", pojo.getHost());
+    Assert.assertEquals("dsmith", pojo.getUserName());
+    Assert.assertEquals("10/Oct/1999:21:15:05 +0500", pojo.getDatetime());
+    Assert.assertEquals("GET /index.html HTTP/1.0", pojo.getRequest());
+    Assert.assertEquals("200", pojo.getStatusCode());
+    Assert.assertEquals("1043", pojo.getBytes());
+    Assert.assertEquals("http://www.ibm.com/", pojo.getReferrer());
+    Assert.assertEquals("Mozilla/4.05 [en] (WinNT; I)", pojo.getUser_agent());
+    Assert.assertEquals("USERID=CustomerA;IMPID=01234", pojo.getCookie());
+  }
+
+  @Test
+  public void TestInvalidCombinedLogInput()
+  {
+    String tuple = "127.0.0.1 - dsmith [10/Oct/1999:21:15:05] GET /index.html HTTP/1.0\" 200 1043 \"http://www.ibm.com/\" \"Mozilla/4.05 [en] (WinNT; I)\" \"USERID=CustomerA;IMPID=01234\"";
+    logParser.beginWindow(0);
+    logParser.in.process(tuple.getBytes());
+    logParser.endWindow();
+    Assert.assertEquals(0, pojoPort.collectedTuples.size());
+    Assert.assertEquals(1, error.collectedTuples.size());
+  }
+
+  @Test
   public void TestSchemaInput() throws JSONException, java.io.IOException
   {
     logParser.setLogFileFormat(SchemaUtils.jarResourceFileToString(filename));

@@ -166,6 +166,9 @@ public class LogParser extends Parser<byte[], KeyValPair<String, String>>
         case COMMON:
           log = new CommonLog();
           break;
+        case COMBINED:
+          log = new CombinedLog();
+          break;
         default: break;
       }
     } else {
