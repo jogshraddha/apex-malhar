@@ -18,8 +18,9 @@
  */
 package com.datatorrent.contrib.parser;
 
+import java.io.IOException;
+
 import org.codehaus.jettison.json.JSONException;
-import org.jooq.exception.IOException;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
@@ -84,6 +85,42 @@ public class LogParserTest
   }
 
   @Test
+  public void TestValidCommonLogInputCase() throws JSONException, IOException
+  {
+    logParser.setLogFileFormat("common");
+    logParser.setup(null);
+    logParser.setupLog();
+    logParser.beginWindow(0);
+    String log = "125.125.125.125 - dsmith [10/Oct/1999:21:15:05 +0500] \"GET /index.html HTTP/1.0\" 200 1043";
+    logParser.in.process(log.getBytes());
+    logParser.endWindow();
+    Assert.assertEquals(1, pojoPort.collectedTuples.size());
+    Assert.assertEquals(0, error.collectedTuples.size());
+    Object obj = pojoPort.collectedTuples.get(0);
+    Assert.assertNotNull(obj);
+    Assert.assertEquals(CommonLog.class, obj.getClass());
+    CommonLog pojo = (CommonLog)obj;
+    Assert.assertNotNull(obj);
+    Assert.assertEquals("125.125.125.125", pojo.getHost());
+    Assert.assertEquals("dsmith", pojo.getUsername());
+    Assert.assertEquals("10/Oct/1999:21:15:05 +0500", pojo.getDatetime());
+    Assert.assertEquals("GET /index.html HTTP/1.0", pojo.getRequest());
+    Assert.assertEquals("200", pojo.getStatusCode());
+    Assert.assertEquals("1043", pojo.getBytes());
+  }
+
+  @Test
+  public void TestInvalidCommonLogInput()
+  {
+    String tuple = "127.0.0.1 - dsmith 10/Oct/1999:21:15:05] \"GET /index.html HTTP/1.0\" 200 1043";
+    logParser.beginWindow(0);
+    logParser.in.process(tuple.getBytes());
+    logParser.endWindow();
+    Assert.assertEquals(0, pojoPort.collectedTuples.size());
+    Assert.assertEquals(1, error.collectedTuples.size());
+  }
+
+  @Test
   public void TestSchemaInput() throws JSONException, java.io.IOException
   {
     logParser.setLogFileFormat(SchemaUtils.jarResourceFileToString(filename));
@@ -106,7 +143,7 @@ public class LogParserTest
   }
 
   @Test
-  public void TestInvalidSchemaInput() throws JSONException, IOException
+  public void TestInvalidSchemaInput() throws JSONException
   {
     logParser.setLogFileFormat(SchemaUtils.jarResourceFileToString("invalidLogSchema.json"));
     logParser.setup(null);

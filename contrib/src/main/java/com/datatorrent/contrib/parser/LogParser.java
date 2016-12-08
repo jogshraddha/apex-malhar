@@ -24,6 +24,7 @@ import org.codehaus.jettison.json.JSONException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.commons.lang3.CharEncoding;
+import org.apache.commons.lang3.EnumUtils;
 import org.apache.commons.lang3.StringUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.datatorrent.api.AutoMetric;
@@ -59,6 +60,8 @@ public class LogParser extends Parser<byte[], KeyValPair<String, String>>
   private LogSchemaDetails logSchemaDetails;
 
   private transient ObjectMapper objMapper;
+
+  private Log log;
 
   @Override
   public Object convert(byte[] tuple)
@@ -126,6 +129,12 @@ public class LogParser extends Parser<byte[], KeyValPair<String, String>>
           parsedOutput.emit(objMapper.readValue(this.logSchemaDetails.createJsonFromLog(incomingString).toString().getBytes(), clazz));
           parsedOutputCount++;
         }
+      } else {
+        Log parsedLog = log.getLog(incomingString);
+        if(parsedLog != null && parsedOutput.isConnected()) {
+          parsedOutput.emit(parsedLog);
+          parsedOutputCount++;
+        }
       }
     } catch (NullPointerException | IOException | JSONException e) {
       this.emitError(incomingString, e.getMessage());
@@ -151,11 +160,21 @@ public class LogParser extends Parser<byte[], KeyValPair<String, String>>
    */
   public void setupLog()
   {
-    try {
-      //parse the schema from logFileFormat string
-      this.logSchemaDetails = new LogSchemaDetails(logFileFormat);
-    } catch (IllegalArgumentException e) {
-      logger.error("Error while initializing the custom log format " + e.getMessage());
+    if(EnumUtils.isValidEnum(DefaultLogs.class, logFileFormat.toUpperCase())){
+      DefaultLogs defaultLog = DefaultLogs.valueOf(logFileFormat.toUpperCase());
+      switch (defaultLog) {
+        case COMMON:
+          log = new CommonLog();
+          break;
+        default: break;
+      }
+    } else {
+      try {
+        //parse the schema from logFileFormat string
+        this.logSchemaDetails = new LogSchemaDetails(logFileFormat);
+      } catch (IllegalArgumentException e) {
+        logger.error("Error while initializing the custom log format " + e.getMessage());
+      }
     }
   }
 
